@@ -1,3 +1,5 @@
 #!/bin/bash
-g++ $1.cpp -o $1.out -lglfw3 -lGL -lX11 -lpthread -lXrandr -lXi -ldl -std=c++17
+
+g++ -c $1.cpp -o ./obj/$1.o
+g++ ./obj/$1.o ./obj/glad.o -lGL -lGLU -lglfw3 -lXxf86vm -lXrandr -pthread -lXi -ldl -lX11 -lXinerama -lXcursor -o $1.out
 if [[ "$2" == "run" ]]; then ./$1.out; fi
