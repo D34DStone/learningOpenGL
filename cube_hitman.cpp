@@ -3,6 +3,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#define STB_IMAGE_IMPLEMENTATION
+#include "include/stb_image.h"
 #include <iostream>
 #include <string>
 #include <fstream>
@@ -103,7 +105,36 @@ public:
     {
         glUseProgram(this->ID);
     }
+
+    unsigned int getID()
+    {
+        return this->ID;
+    }
 };
+
+unsigned int loadTexture(const std::string &file)
+{
+    unsigned int texture;
+    int width, height, nChannels;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    unsigned char *data = stbi_load(file.c_str(), &width, &height, &nChannels, 0);
+    if(!data)
+    {
+        std::cerr << "Unable to load texture from " << file << std::endl;
+    }
+    else
+    {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }
+    stbi_image_free(data);
+    return texture;
+}
 
 void initGL(void)
 {
@@ -150,30 +181,66 @@ int main()
     Shader shader("cube_hitman_ver.glsl", "cube_hitman_frag.glsl");
 
     float vertices[] = {
-        -0.5f, -0.5f, 0.0f,
-        0.5f, -0.5f, 0.0f,
-        0.0f,  0.5f, 0.0f
+        -0.5f, -0.5f, 0.5f,  0.0f, 0.0f,
+         0.5f, -0.5f, 0.5f,  1.0f, 0.0f,
+         0.5f,  0.5f, 0.5f,  1.0f, 1.0f,
+        -0.5f,  0.5f, 0.5f,  0.0f, 1.0f,
+
+        -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
+         0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
+         0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+        -0.5f,  0.5f, -0.5f,  0.0f, 1.0f
     };  
 
-    unsigned int VBO, VAO;
+    unsigned int indices[] = {
+        0, 1, 3,
+        2, 3, 1,
+        2, 1, 5, 
+        6, 2, 5, 
+        6, 5, 4, 
+        7, 4, 6,
+        7, 3, 4,
+        0, 3, 4,
+        7, 3, 2,
+        6, 7, 2,
+        0, 4, 1,
+        4, 5, 1
+    };
+
+    unsigned int VBO, VAO, EBO;
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
+    glGenBuffers(1, &EBO);
 
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*) 0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*) 0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*) (3 * sizeof(float)));
+
+    unsigned int texture = loadTexture("resources/wall2.png");
 
     while(!glfwWindowShouldClose(window))
     {
         processInput(window);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        shader.use();
+        glBindTexture(GL_TEXTURE_2D, texture);
         glBindVertexArray(VAO);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        shader.use();
+
+        glm::mat4 transform(1.0);        
+        //transform = glm::translate(transform, glm::vec3(0.0f, 0.0f, 1.0f));
+        transform = glm::rotate(transform, (float)glfwGetTime(), glm::vec3(1.0f, 0.5f, 0.25f));
+        unsigned int transformLoc = glGetUniformLocation(shader.getID(), "transform");
+        glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transform));
+        // delete this line to fill the polygons
+        // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, (const void*)(0 * sizeof(unsigned int)));
 
         glfwSwapBuffers(window);
         glfwPollEvents();    
